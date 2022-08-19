@@ -18,11 +18,23 @@ def prefilter_items(data, take_n_popular=5000, item_features=None):
     data = data[data['week_no'] < 12 * 4]
     
     # Уберем не интересные для рекоммендаций категории (department)
-    
+    if item_features is not None:
+        department_size = pd.DataFrame(item_features.\
+                                        groupby('department')['item_id'].nunique().\
+                                        sort_values(ascending=False)).reset_index()
+
+        department_size.columns = ['department', 'n_items']
+        rare_departments = department_size[department_size['n_items'] < 150].department.tolist()
+        items_in_rare_departments = item_features[item_features['department'].isin(rare_departments)].item_id.unique().tolist()
+
+        data = data[~data['item_id'].isin(items_in_rare_departments)]
 
     # Уберем слишком дешевые товары (на них не заработаем). 1 покупка из рассылок стоит 60 руб.
-
+    data['price'] = data['sales_value'] / (np.maximum(data['quantity'], 1))
+    data = data[data['price'] > 2]
+    
     # Уберем слишком дорогие товары
+    data = data[data['price'] < 50]
     
     # Возбмем топ по популярности
     popularity = data.groupby('item_id')['quantity'].sum().reset_index()
